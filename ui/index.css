@@ -1,0 +1,76 @@
+body {
+	background-color: #E6E6E6;
+}
+html,
+body {
+	height: 100%;
+}
+.imagebg {
+	background-image: url("background-main.jpg");
+	background-repeat: no-repeat;
+	background-position: center center;
+	background-size: cover;
+	background-attachment: fixed;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	-webkit-filter: blur(3px);
+  filter: blur(3px);
+  opacity: 0.6;
+  filter: alpha(opacity=60);
+}
+
+#logo {
+	padding-top: 20px;
+	width: 100%;
+}
+
+#user-feedback {
+	border-radius: 15px;
+	background: #F16737;
+}
+
+#user-feedback p {
+	padding-left: 8px;
+	padding-right: 8px;
+	font-size: 25px;
+}
+
+h2 {
+	padding-top: 30px;
+}
+
+.btn-file {
+	position: relative;
+	overflow: hidden;
+}
+.btn-file input[type=file] {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 100%;
+	min-height: 100%;
+	font-size: 100px;
+	text-align: right;
+	filter: alpha(opacity=0);
+	opacity: 0;
+	outline: none;
+	background: white;
+	cursor: inherit;
+	display: block;
+}
+
+.progress {
+	position: relative;
+	margin-top: 15px;
+}
+
+.progress span {
+	position: absolute;
+	display: block;
+	width: 100%;
+	color: black;
+	font-weight: bold;
+ }

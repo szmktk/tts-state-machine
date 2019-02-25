@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TTS demo</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" >
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" >
+  </head>
+  <body>
+      <div class="container">
+          <div class="imagebg"></div>
+          <div class="row">
+              <div class="col-md-6 col-md-offset-3">
+                  <img id="logo" src="logo-donker.png" />
+                  <h2>TTS demo</h2>
+                  <form id="myForm" action="https://a1e8849i93.execute-api.eu-west-1.amazonaws.com/demo" method="post" enctype="text/plain" >
+                      <div class="row">
+                          <div class="col-sm-12 form-group">
+                              <label for="date"> Wpisz jakiś krótki tekst (po polsku): </label>
+                              <input id="date" class="form-control" name="x" type="text" />
+                          </div>
+                          <div class="col-sm-12 form-group">
+                            <label for="email"> Oraz swój adres email: </label>
+                            <input id="email" class="form-control" name="p" type="text" />
+                        </div>
+                      </div>
+                      <div class="row">
+                          <div class="col-sm-12 form-group">
+                              <input class="btn btn-lg btn-success btn-block" id="submit" type="submit" value="Submit">
+                          </div>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      </div>
+    </body>
+</html>

@@ -1,0 +1,522 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Device Migration State Machine Stack
+Parameters:
+  LambdaArchive:
+    Description: Name of the zip archive that holds the source code of all lambdas
+    Type: String
+  BucketName:
+    Description: Name of the S3 bucket that holds the projects artifacts
+    Type: String
+  StaticWebsiteBucketName:
+    Description: Name of the S3 bucket that holds the html files with audio-tagged synthesized speech
+    Type: String
+Resources:
+  StartExecutionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref BucketName
+        S3Key: !Ref LambdaArchive
+      Description: A function that is responsible for the creation of a workflow
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref TricityCloudComputingStateMachine
+      FunctionName: start-execution
+      Handler: start_execution.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'StartExecutionRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  StartExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: start-execution-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+              - states:DescribeExecution
+              - states:StartExecution
+            Resource: !Ref TricityCloudComputingStateMachine
+  SaveTextLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that saves text provided by the user as a text file to S3
+      Environment:
+        Variables:
+          BUCKET_NAME: tricity-ccg
+      FunctionName: save-text-to-s3
+      Handler: save_text_to_s3.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'SaveTextRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  SaveTextRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: save-text-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
+  CreateUserTopicLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that creates a SNS topic for each user
+      FunctionName: create-user-topic
+      Handler: create_user_topic.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'CreateUserTopicRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  CreateUserTopicRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: create-user-topic-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action: sns:CreateTopic
+            Resource: '*'
+  ConvertToAudioLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that converts text file to an mp3 file with synthesized speech
+      FunctionName: convert-to-audio
+      Handler: convert_to_audio.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'ConvertToAudioRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  ConvertToAudioRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: convert-to-audio-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action: polly:SynthesizeSpeech
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:PutObjectAcl
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub 'arn:aws:s3:::${BucketName}'
+              - !Sub 'arn:aws:s3:::${BucketName}/*'
+  AddSubscriberLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that subscribes an user to a topic
+      FunctionName: add-subscriber
+      Handler: add_subscriber.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'AddSubscriberRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  AddSubscriberRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: add-subscriber-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+              - sns:Subscribe
+              - sns:ListSubscriptionsByTopic
+            Resource: '*'
+  SendEmailLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that sends a message to the user subscribed to the given topic
+      FunctionName: send-email
+      Handler: send_email.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'SendEmailRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  SendEmailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: send-email-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action: sns:Publish
+            Resource: '*'
+  SubscriptionWorkerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: An activity worker that checks if the user has subscribed to the SNS topic. Exits in 5 minutes
+      FunctionName: subscription-worker
+      Handler: subscription_worker.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'SubscriptionWorkerLambdaRole.Arn'
+      Runtime: python3.7
+      Timeout: 300
+  SubscriptionWorkerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: subscription-worker-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action: sns:ListSubscriptionsByTopic
+            Resource: '*'
+          - Effect: Allow
+            Action: states:SendTaskSuccess
+            Resource: '*'
+  CreateAudioPageLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: tricity-ccg
+        S3Key: !Ref LambdaArchive
+      Description: A function that creates a webpage with a link to an audio file with speech sythesized off user's input
+      Environment:
+        Variables:
+          STATIC_WEBSITE_BUCKET_NAME: !Ref StaticWebsiteBucketName
+      FunctionName: create-audio-page
+      Handler: create_audio_page.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt 'CreateAudioPageLambdaRole.Arn'
+      Runtime: python3.7
+      Timeout: 10
+  CreateAudioPageLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: create-audio-page-cf-policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}'
+              - !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}/*'
+  TricityCloudComputingStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: TricityCloudComputingStateMachine
+      DefinitionString: !Sub
+      - |-
+        {
+          "Comment": "Tricity Cloud Computing Group Demo",
+          "StartAt": "SaveText",
+          "States": {
+            "SaveText": {
+              "Type": "Task",
+              "Resource": "${SaveTextLambdaArn}",
+              "Next": "CreateUserTopic",
+              "ResultPath": "$.savedText"
+            },
+            "CreateUserTopic": {
+              "Type": "Task",
+              "Resource": "${CreateUserTopicLambdaArn}",
+              "Next": "AddSubscriber",
+              "ResultPath": "$.topicArn"
+            },
+            "AddSubscriber": {
+              "Type": "Task",
+              "Resource": "${AddSubscriberLambdaArn}",
+              "Next": "ParallelTask",
+              "ResultPath": null
+            },
+            "ParallelTask": {
+              "Type": "Parallel",
+              "Next": "CreateAudioPage",
+              "Branches": [
+                {
+                  "StartAt": "ConvertToAudio",
+                  "States": {
+                    "ConvertToAudio": {
+                      "Type": "Task",
+                      "Resource": "${ConvertToAudioLambdaArn}",
+                      "ResultPath": "$.audioUrl",
+                      "End": true
+                    }
+                  }
+                },
+                {
+                  "StartAt": "ProcessUsersSubscription",
+                  "States": {
+                    "ProcessUsersSubscription": {
+                      "Type": "Task",
+                      "Resource": "${ProcessUsersSubscriptionActivityArn}",
+                      "TimeoutSeconds": 600,
+                      "ResultPath": "$.isConfirmed",
+                      "OutputPath": null,
+                      "End": true
+                    }
+                  }
+                }
+              ]
+            },
+            "CreateAudioPage": {
+              "Type": "Task",
+              "Resource": "${CreateAudioPageLambdaArn}",
+              "Next": "SendEmail",
+              "ResultPath": "$[0].refs",
+              "OutputPath": "$[0].refs"
+            },
+            "SendEmail": {
+              "Type": "Task",
+              "Resource": "${SendEmailLambdaArn}",
+              "ResultPath": null,
+              "End": true
+            }
+          }
+        }
+      - SaveTextLambdaArn: !GetAtt 'SaveTextLambda.Arn'
+        CreateUserTopicLambdaArn: !GetAtt 'CreateUserTopicLambda.Arn'
+        AddSubscriberLambdaArn: !GetAtt 'AddSubscriberLambda.Arn'
+        ConvertToAudioLambdaArn: !GetAtt 'ConvertToAudioLambda.Arn'
+        ProcessUsersSubscriptionActivityArn: !Ref ProcessUsersSubscriptionActivity
+        CreateAudioPageLambdaArn: !GetAtt 'CreateAudioPageLambda.Arn'
+        SendEmailLambdaArn: !GetAtt 'SendEmailLambda.Arn'
+      RoleArn: !GetAtt 'StatesExecutionRole.Arn'
+  StatesExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - !Sub 'states.${AWS::Region}.amazonaws.com'
+          Action: sts:AssumeRole
+      Path: /service-role/
+      Policies:
+        - PolicyName: TricityCloudComputingSMRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+  ProcessUsersSubscriptionActivity:
+    Type: 'AWS::StepFunctions::Activity'
+    Properties:
+      Name: ProcessUsersSubscriptionActivity
+  TricityCloudComputingApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Body:
+        swagger: 2.0
+        info:
+          version: 1.0.0
+          title: TricityCloudComputingApi
+        schemes:
+          - 'https'
+        paths:
+          /:
+            post:
+              produces:
+              - 'application/json'
+              responses:
+                '200':
+                  description: '200 response'
+                  schema:
+                    $ref: '#/definitions/Empty'
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${StartExecutionLambda}/invocations'
+                responses:
+                  default:
+                    statusCode: '200'
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                contentHandling: 'CONVERT_TO_TEXT'
+                type: 'aws_proxy'
+        definitions:
+          Empty:
+            type: 'object'
+            title: 'Empty Schema'
+  TricityCloudComputingApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref TricityCloudComputingApi
+      Description: Device Migration Service deployment
+      StageName: demo
+  PermissionForApiGatewayToInvokeStartExecutionLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StartExecutionLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  AudioFileStaticWebsite:
+    Type: AWS::S3::Bucket
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref StaticWebsiteBucketName
+  AudioFileStaticWebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: AudioFileStaticWebsite
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}/*'
+Outputs:
+  StaticWebsiteUrl:
+    Description: The URL of the static website with generated html files
+    Value: !GetAtt 'AudioFileStaticWebsite.WebsiteURL'
