@@ -85,7 +85,7 @@ def wait_until_deployed(wait_period):
 
 
 def create_stack(parameters, template):
-    print('INFO: Creating CloudFormation stack..')
+    print('INFO: Creating CloudFormation stack...')
     cf.create_stack(
         StackName=stack_name,
         TemplateBody=template,
@@ -168,7 +168,7 @@ def print_website_url():
     print('INFO: The app\'s UI is accessible at: {}'. format(website_url))
 
 
-def check_config(b1, b2):
+def validate_bucket_names(b1, b2):
     pattern = re.compile('(?=^.{3,63}$)(?!^(\\d+\\.)+\\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])\\.)*([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])$)')
     if not pattern.match(b1) or not pattern.match(b2):
         print('ERROR: Missing or faulty configuration variables. Please provide valid bucket names in the config.ini file')
@@ -181,10 +181,14 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config', metavar='configfile', default='config.ini', help='The path to the app configuration file (default="config.ini").')
     args = parser.parse_args()
 
+    if not os.path.isfile(args.template) or not os.path.isfile(args.config):
+        print('ERROR: "resources.yaml" or "config.ini" file is missing, please provide them both or specify a path using "-t" and "-c" options.')
+        sys.exit(1)
+
     config = configparser.ConfigParser()
     config.read(args.config)
     static_website_bucket_name = config['default']['static_website_bucket_name']
     artifacts_bucket_name = config['default']['artifacts_bucket_name']
-    check_config(static_website_bucket_name, artifacts_bucket_name)
+    validate_bucket_names(static_website_bucket_name, artifacts_bucket_name)
 
     sys.exit(main(args.template))
