@@ -1,6 +1,4 @@
 import boto3
-import os
-import re
 
 sns = boto3.client('sns')
 

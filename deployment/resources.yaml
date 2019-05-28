@@ -140,6 +140,9 @@ Resources:
         S3Bucket: !Ref ArtifactsBucketName
         S3Key: !Ref LambdaArchive
       Description: A function that converts text file to an mp3 file with synthesized speech
+      Environment:
+        Variables:
+          VOICE: Joanna
       FunctionName: convert-to-audio
       Handler: convert_to_audio.lambda_handler
       MemorySize: 128

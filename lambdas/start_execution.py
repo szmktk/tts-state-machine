@@ -29,8 +29,8 @@ def prepare_response():
     return '<html> \
                 <div style="text-align: center"> \
                     <br/><br/><br/><br/><br/><br/><br/><br/>\
-                    <h2>Sprawdź swoją skrzynkę pocztową</h2><br/> \
-                    <h2>W ciągu pięciu minut potwierdź subskrypcję tematu SNS by przejść dalej</h2><br/> \
+                    <h2>Please check your mailbox</h2><br/> \
+                    <h2>In order to continue, please click on the "Confirm subscription" link in the email you\'ve received</h2><br/> \
                 <body bgcolor="#F0F0F0"> \
                 </body> \
                 </div> \

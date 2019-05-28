@@ -3,7 +3,7 @@ import os
 from contextlib import closing
 
 s3 = boto3.client('s3')
-voice = os.environ.get('VOICE', 'Ewa')
+voice = os.environ.get('VOICE', 'Joanna')
 
 def lambda_handler(event, context):
     bucket = event['savedText']['bucket']
