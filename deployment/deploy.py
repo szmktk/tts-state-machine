@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 s3 = boto3.client('s3')
 cf = boto3.client('cloudformation')
 cf_resource = boto3.resource('cloudformation')
-stack_name = 'Merapar-TTS-Demo'
+stack_name = 'TextToSpeechDemo'
 
 
 def main(template):

@@ -20,7 +20,7 @@ Resources:
       Description: A function that is responsible for the creation of a workflow
       Environment:
         Variables:
-          STATE_MACHINE_ARN: !Ref TricityCloudComputingStateMachine
+          STATE_MACHINE_ARN: !Ref TextToSpeechStateMachine
       FunctionName: start-execution
       Handler: start_execution.lambda_handler
       MemorySize: 128
@@ -53,7 +53,7 @@ Resources:
             Action:
               - states:DescribeExecution
               - states:StartExecution
-            Resource: !Ref TricityCloudComputingStateMachine
+            Resource: !Ref TextToSpeechStateMachine
   SaveTextLambda:
     Type: AWS::Lambda::Function
     Properties:
@@ -347,10 +347,10 @@ Resources:
             Resource:
               - !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}'
               - !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}/*'
-  TricityCloudComputingStateMachine:
+  TextToSpeechStateMachine:
     Type: AWS::StepFunctions::StateMachine
     Properties:
-      StateMachineName: TricityCloudComputingStateMachine
+      StateMachineName: TextToSpeechStateMachine
       DefinitionString: !Sub
       - |-
         {
