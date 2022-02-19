@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
-
+import configparser
+import logging
+import mimetypes
 import os
 import re
+import shutil
 import sys
 import time
-import boto3
-import shutil
-import mimetypes
-import configparser
 from argparse import ArgumentParser
+
+import boto3
 from botocore.exceptions import ClientError
 
+logging.basicConfig()
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 s3 = boto3.client('s3')
 cf = boto3.client('cloudformation')
-cf_resource = boto3.resource('cloudformation')
-stack_name = 'TextToSpeechDemo'
+
+INDEX_FILE_PATH = '../ui/index.html'
+S3_BUCKET_NAME_VALIDATION_REGEX = '(?=^.{3,63}$)(?!^(\\d+\\.)+\\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])\\.)*([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])$)'
+STACK_NAME = 'TextToSpeechDemo'
 
 
 def main(template):
@@ -27,7 +33,7 @@ def main(template):
 
 def create_archive():
     archive_dir = 'archives'
-    archive_name = 'lambda-archive-{}'.format(round(time.time()))
+    archive_name = f'lambda-archive-{round(time.time())}'
     if not os.path.isdir(archive_dir):
         os.mkdir(archive_dir)
     return shutil.make_archive(os.path.join(archive_dir, archive_name), 'zip', '../lambdas')
@@ -36,11 +42,11 @@ def create_archive():
 def deploy_lambda_code(code_archive_path):
     create_deployment_bucket()
     if os.path.isfile(code_archive_path):
-        print('INFO: Sending the lambda function package "{}" to s3 bucket: "{}"'.format(code_archive_path, artifacts_bucket_name))
+        logger.info(f'Sending the lambda function package "{code_archive_path}" to s3 bucket: "{artifacts_bucket_name}"')
         s3.upload_file(code_archive_path, artifacts_bucket_name, os.path.split(code_archive_path)[1])
-        print('INFO: Upload successful.')
+        logger.info('Upload successful')
     else:
-        print('ERROR: File not found: {}'.format(code_archive_path))
+        logger.error(f'File not found: {code_archive_path}')
         sys.exit(1)
 
 
@@ -58,7 +64,6 @@ def create_deployment_bucket():
 
 
 def deploy_stack(template, archive_path):
-    deploy_wait = 30
     template_body = read_template_body(template)
     parameters = get_parameters(archive_path)
     try:
@@ -67,46 +72,44 @@ def deploy_stack(template, archive_path):
         if not e.response['Error']['Code'] == 'AlreadyExistsException':
             raise
         else:
-            print('INFO: Stack already exists, updating...')
-            deploy_wait = update_stack(parameters, template_body)
-    wait_until_deployed(deploy_wait)
-
-
-def wait_until_deployed(wait_period):
-    stack_status = None
-    while stack_status not in ['CREATE_COMPLETE', 'UPDATE_COMPLETE']:
-        if stack_status in ['ROLLBACK_IN_PROGRESS', 'ROLLBACK_COMPLETE', 'UPDATE_ROLLBACK_IN_PROGRESS', 'UPDATE_ROLLBACK_COMPLETE']:
-            print('ERROR: Stack deployment failed!')
-            sys.exit(1)
-        print('INFO: Checking if stack deployment is complete in {} seconds...'.format(wait_period))
-        stack_status = cf_resource.Stack(stack_name).stack_status
-        time.sleep(wait_period)
-    print('INFO: Stack deployment complete!')
+            logger.info('Stack already exists, updating...')
+            update_stack(parameters, template_body)
 
 
 def create_stack(parameters, template):
-    print('INFO: Creating CloudFormation stack...')
+    logger.info('Creating CloudFormation stack...')
     cf.create_stack(
-        StackName=stack_name,
+        StackName=STACK_NAME,
         TemplateBody=template,
         Parameters=parameters,
         Capabilities=['CAPABILITY_IAM']
     )
 
+    waiter = cf.get_waiter('stack_create_complete')
+    logger.info(f'Waiting for stack {STACK_NAME} to be created')
+    waiter.wait(StackName=STACK_NAME)
+    logger.info(f'Stack {STACK_NAME} created successfully')
+
 
 def update_stack(parameters, template):
     try:
         cf.update_stack(
-            StackName=stack_name,
+            StackName=STACK_NAME,
             TemplateBody=template,
             Parameters=parameters,
             Capabilities=['CAPABILITY_IAM']
         )
-        return 5
     except ClientError as e:
         if e.response['Error']['Message'] == 'No updates are to be performed.':
-            print('INFO: No CloudFormation stack updates are to be performed')
-            return 0
+            logger.info('No CloudFormation stack updates are to be performed')
+
+    waiter = cf.get_waiter('stack_update_complete')
+    logger.info(f'Waiting for stack {STACK_NAME} to be updated')
+    waiter.wait(
+        StackName=STACK_NAME,
+        WaiterConfig={'Delay': 5}
+    )
+    logger.info(f'Stack {STACK_NAME} updated successfully')
 
 
 def read_template_body(template):
@@ -134,44 +137,48 @@ def get_parameters(archive_path):
 def deploy_ui_layer(bucket_name):
     substitute_api_id()
     ui_path = '../ui'
-    print('INFO: Uploading files to static website bucket "{}":'.format(bucket_name))
+    logger.info(f'Uploading files to static website bucket "{bucket_name}":')
     for name in os.listdir(ui_path):
-        localpath = os.path.join(ui_path, name)
-        if os.path.isfile(localpath):
-            print('INFO: Uploading {}'.format(localpath))
-            upload_file_with_metadata(localpath, bucket_name, name)
+        local_path = os.path.join(ui_path, name)
+        if os.path.isfile(local_path):
+            logger.info(f'Uploading {local_path}')
+            upload_file_with_metadata(local_path, bucket_name, name)
     print_website_url()
 
 
-def upload_file_with_metadata(localpath, bucket_name, name):
-    mimetype = mimetypes.guess_type(localpath)[0]
-    s3.upload_file(localpath, bucket_name, name, ExtraArgs={'ContentType': mimetype})
+def upload_file_with_metadata(local_path, bucket_name, name):
+    mimetype = mimetypes.guess_type(local_path)[0]
+    s3.upload_file(local_path, bucket_name, name, ExtraArgs={'ContentType': mimetype})
 
 
 def substitute_api_id():
     apis = boto3.client('apigateway').get_rest_apis()
     for api in apis['items']:
         if api['name'] == 'TricityCloudComputingApi':
-            print('INFO: Fixing ApiGateway id in index.html file')
-            with open('../ui/index.html', 'r') as f:
-                lines = f.readlines()
-            with open('../ui/index.html', 'w') as f:
-                for line in lines:
-                    f.write(re.sub(r'https://[a-z0-9]{10}.execute-api', 'https://{}.execute-api'.format(api['id']), line))
+            perform_substitution(api)
             return
-    print('WARN: No api with name "TricityCloudComputingApi" found! Please fix ApiGateway id manually.')
+    logger.warning('No api with name "TricityCloudComputingApi" found! Please fix ApiGateway id manually.')
+
+
+def perform_substitution(api):
+    logger.info('Fixing ApiGateway id in index.html file')
+    with open(INDEX_FILE_PATH, 'r') as f:
+        lines = f.readlines()
+    with open(INDEX_FILE_PATH, 'w') as f:
+        for line in lines:
+            f.write(re.sub(r'https://[a-z0-9]{10}.execute-api', f'https://{api["id"]}.execute-api', line))
 
 
 def print_website_url():
-    stack_outputs = cf_resource.Stack(stack_name).outputs
-    website_url = stack_outputs[0]['OutputValue']
-    print('INFO: The app\'s UI is accessible at: {}'. format(website_url))
+    response = cf.describe_stacks(StackName=STACK_NAME)
+    website_url = response['Stacks'][0]['Outputs'][0]['OutputValue']
+    logger.info(f'The app\'s UI is accessible at: {website_url}')
 
 
-def validate_bucket_names(b1, b2):
-    pattern = re.compile('(?=^.{3,63}$)(?!^(\\d+\\.)+\\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])\\.)*([a-z0-9]|[a-z0-9][a-z0-9\\-]*[a-z0-9])$)')
-    if not pattern.match(b1) or not pattern.match(b2):
-        print('ERROR: Missing or faulty configuration variables. Please provide valid bucket names in the config.ini file')
+def validate_bucket_name(bucket_name):
+    pattern = re.compile(S3_BUCKET_NAME_VALIDATION_REGEX)
+    if not pattern.match(bucket_name):
+        logger.error('Missing or faulty configuration variables. Please provide valid bucket names in the config.ini file')
         sys.exit(1)
 
 
@@ -182,13 +189,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not os.path.isfile(args.template) or not os.path.isfile(args.config):
-        print('ERROR: "resources.yaml" or "config.ini" file is missing, please provide them both or specify a path using "-t" and "-c" options.')
+        logger.error('"resources.yaml" or "config.ini" file is missing, please provide them both or specify a path using "-t" and "-c" options.')
         sys.exit(1)
 
     config = configparser.ConfigParser()
     config.read(args.config)
-    static_website_bucket_name = config['default']['static_website_bucket_name']
     artifacts_bucket_name = config['default']['artifacts_bucket_name']
-    validate_bucket_names(static_website_bucket_name, artifacts_bucket_name)
+    validate_bucket_name(artifacts_bucket_name)
+    static_website_bucket_name = config['default']['static_website_bucket_name']
+    validate_bucket_name(static_website_bucket_name)
 
     sys.exit(main(args.template))

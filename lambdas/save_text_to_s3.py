@@ -1,29 +1,32 @@
 import os
+
 import boto3
 
 
-def lambda_handler(event, context):
+def lambda_handler(event, _):
     s3 = boto3.client('s3')
-    bucket = os.environ['BUCKET_NAME']
-    key = 'text/text_{}'.format(event['execution_name'])
+    bucket_name = os.environ['BUCKET_NAME']
+    key = f'text/text_{event["execution_name"]}'
     text = event['text']
 
-    response = s3.put_object(
+    s3.put_object(
         Body=text,
-        Bucket=bucket,
+        Bucket=bucket_name,
         ContentType='text/plain; charset=utf-8',
         Key=key,
     )
+
     return {
-        'bucket': bucket,
+        'bucket': bucket_name,
         'key': key,
-        'body': 'Successfully uploaded file: {} to bucket: {}'.format(key, bucket)
+        'body': f'Successfully uploaded file: {key} to bucket: {bucket_name}'
     }
 
+
 if __name__ == '__main__':
-    event = {
+    lambda_event = {
         'text': 'x=this is text that will be saved to s3',
         'email': 'dev@example.com',
         'execution_name': 'dev@example.com-57224180'
     }
-    print(lambda_handler(event, None))
+    print(lambda_handler(lambda_event, None))

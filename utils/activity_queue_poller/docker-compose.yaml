@@ -1,0 +1,8 @@
+version: '3'
+services:
+  activity_queue_poller:
+    image: activity_queue_poller
+    container_name: activity_queue_poller
+    restart: on-failure
+    environment:
+      - ACTIVITY_ARN=arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:activity:ProcessUsersSubscriptionActivity

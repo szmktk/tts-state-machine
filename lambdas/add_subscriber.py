@@ -2,7 +2,8 @@ import boto3
 
 sns = boto3.client('sns')
 
-def lambda_handler(event, context):
+
+def lambda_handler(event, _):
     email = event['email']
     topic_arn = event['topicArn']
     if not is_user_subscribed(topic_arn):
@@ -23,8 +24,8 @@ def subscribe_user(topic_arn, email):
 
 
 if __name__ == '__main__':
-    event = {
+    lambda_event = {
         'email': 'dev@example.com',
         'topicArn': 'arn:aws:sns:eu-west-1:880123456789:dev-example-com'
     }
-    lambda_handler(event, None)
+    lambda_handler(lambda_event, None)

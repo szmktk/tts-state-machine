@@ -1,17 +1,26 @@
-import boto3
-import os
 import json
+import logging
+import os
 import random
+
+import boto3
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 sfn = boto3.client('stepfunctions')
 
-def lambda_handler(event, context):
+STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
+
+
+def lambda_handler(event, _):
     user_input = event['body'].split('\r\n')
     text = user_input[0][2:]
     email = user_input[1][2:]
-    execution_name = '{}-{}'.format(email, '{:08}'.format(random.randrange(10**8)))
-    response = sfn.start_execution(
-        stateMachineArn=os.environ['STATE_MACHINE_ARN'],
+    execution_name = f'{email}-{f"{random.randrange(10 ** 8):08}"}'
+    logger.info(f'Starting execution of state machine: {STATE_MACHINE_ARN}')
+    sfn.start_execution(
+        stateMachineArn=STATE_MACHINE_ARN,
         name=execution_name,
         input=json.dumps({'text': text, 'email': email, 'execution_name': execution_name})
     )
@@ -38,5 +47,5 @@ def prepare_response():
 
 
 if __name__ == '__main__':
-    event = {'body': 'this text will get converted'}
-    lambda_handler(event, None)
+    ui_event = {'body': 'this text will get converted'}
+    lambda_handler(ui_event, None)

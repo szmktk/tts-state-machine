@@ -5,7 +5,8 @@ from contextlib import closing
 s3 = boto3.client('s3')
 voice = os.environ.get('VOICE', 'Joanna')
 
-def lambda_handler(event, context):
+
+def lambda_handler(event, _):
     bucket = event['savedText']['bucket']
     key = event['savedText']['key']
     file_name = key[5:]
@@ -19,12 +20,12 @@ def lambda_handler(event, context):
 
 
 def save_text_file_locally(bucket, key, file_name):
-    s3.download_file(bucket, key, '/tmp/{}'.format(file_name))
+    s3.download_file(bucket, key, f'/tmp/{file_name}')
 
 
 def read_text_file(file_name):
-    with open('/tmp/{}'.format(file_name), 'r') as f:
-            return f.read().replace('\n', '')
+    with open(f'/tmp/{file_name}', 'r') as f:
+        return f.read().replace('\n', '')
 
 
 def convert_text_to_speech(content):
@@ -40,9 +41,13 @@ def convert_text_to_speech(content):
 def save_audio_file_locally(audio_stream, file_name):
     if 'AudioStream' in audio_stream:
         with closing(audio_stream['AudioStream']) as stream:
-            output = os.path.join('/tmp/', file_name)
-            with open(output, 'wb') as file:
-                file.write(stream.read())
+            handle_audio_stream(stream, file_name)
+
+
+def handle_audio_stream(stream, file_name):
+    output = os.path.join('/tmp/', file_name)
+    with open(output, 'wb') as file:
+        file.write(stream.read())
 
 
 def save_audio_file_to_s3(bucket, file_name):
@@ -56,7 +61,7 @@ def get_site_url(bucket, new_key):
     location = s3.get_bucket_location(Bucket=bucket)
     region = location['LocationConstraint']
     if region is None:
-        url_begining = 'https://s3.amazonaws.com/'
+        url_beginning = 'https://s3.amazonaws.com/'
     else:
-        url_begining = 'https://s3-{}.amazonaws.com/'.format(str(region))
-    return '{}{}/{}'.format(url_begining, bucket, new_key)
+        url_beginning = f'https://s3-{str(region)}.amazonaws.com/'
+    return f'{url_beginning}{bucket}/{new_key}'

@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Tricity Cloud Computing Demo State Machine Stack
+
 Parameters:
   LambdaArchive:
     Description: Name of the zip archive that holds the source code of all lambdas
@@ -10,6 +11,7 @@ Parameters:
   StaticWebsiteBucketName:
     Description: Name of the S3 bucket that holds the html files with audio-tagged synthesized speech
     Type: String
+
 Resources:
   StartExecutionLambda:
     Type: AWS::Lambda::Function
@@ -519,6 +521,7 @@ Resources:
             Principal: '*'
             Action: s3:GetObject
             Resource: !Sub 'arn:aws:s3:::${StaticWebsiteBucketName}/*'
+
 Outputs:
   StaticWebsiteUrl:
     Description: The URL of the static website with generated html files

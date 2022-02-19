@@ -5,6 +5,7 @@ session = boto3.session.Session()
 region = os.environ.get('AWS_REGION', session.region_name)
 sns = boto3.client('sns', region_name=region)
 
+
 def main():
     response = sns.list_topics()
     topics = response['Topics']
